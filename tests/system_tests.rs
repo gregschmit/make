@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::process::Command;
 
-/// Represents a path to a test directory, arguments to pass to `omake`, and the expectations.
+/// A test directory, arguments to pass to `omake`, and the test expectations.
 struct SystemTestCase {
     /// Path to this system test directory (relative to project root).
     pub path: String,
@@ -19,9 +19,9 @@ struct SystemTestCase {
 }
 
 impl SystemTestCase {
-    /// Principal interface for constructing a system test, running it, and cleaning up. Note that
-    /// cleanup is done by implementing the `Drop` trait. Since the system test is dropped at the
-    /// end of this function's scope, it is cleaned up.
+    /// Construct a system test, run it, and clean up. Note that cleanup is done by implementing the
+    /// `Drop` trait. Since the system test is dropped at the end of this function's scope, it is
+    /// cleaned up.
     pub fn execute(
         path: &str,
         args: &[&str],

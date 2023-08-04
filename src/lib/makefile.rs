@@ -1,35 +1,25 @@
 //! The core logic for parsing and executing makefiles.
 
+pub mod logical_line;
 pub mod opts;
 pub mod rule_map;
 
-pub use opts::Opts;
+use opts::Opts;
 
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{fs, fs::File};
 
-use crate::context::Context;
 use crate::error::MakeError;
 use crate::expand::expand;
-use crate::logger::Logger;
+use crate::logger::{context::Context, Logger};
 use crate::vars::Vars;
 
+// use logical_line::LogicalLine;
 use rule_map::{Rule, RuleMap};
 
 const COMMENT_INDICATOR: char = '#';
-
-// struct PhysicalLine {
-//     content: String,
-//     index: usize,
-// }
-
-// struct LogicalLine {
-//     physical_lines: Vec<PhysicalLine>,
-//     smushed: String,
-//     breaks: Vec<usize>,
-// }
 
 /// The primary interface for reading, parsing, and executing a makefile.
 #[derive(Debug)]
@@ -37,6 +27,7 @@ pub struct Makefile<L: Logger> {
     pub opts: Opts,
     pub logger: Box<L>,
 
+    // logical_lines: Vec<LogicalLine>,
     rule_map: RuleMap,
     default_target: Option<String>,
 
@@ -48,11 +39,12 @@ pub struct Makefile<L: Logger> {
 
 impl<L: Logger> Makefile<L> {
     /// Principal interface for reading and parsing a makefile.
-    pub fn new(path: PathBuf, opts: Opts, logger: Box<L>, vars: Vars) -> Result<Self, MakeError> {
+    pub fn new(path: PathBuf, opts: Opts, vars: Vars, logger: L) -> Result<Self, MakeError> {
         // Initialize the `Makefile` struct with default values.
         let mut makefile = Self {
             opts,
-            logger: logger,
+            logger: Box::new(logger),
+            // logical_lines: Vec::new(),
             rule_map: RuleMap::new(),
             default_target: None,
             vars: vars,
@@ -62,7 +54,7 @@ impl<L: Logger> Makefile<L> {
 
         // Open the makefile and run it through the parser.
         let file = File::open(&path).map_err(|e| {
-            MakeError::new(format!("Could not read makefile ({}).", e), path.into())
+            MakeError::new(&format!("Could not read makefile ({}).", e), path.into())
         })?;
         makefile.parse(BufReader::new(file))?;
 
@@ -71,14 +63,47 @@ impl<L: Logger> Makefile<L> {
 
     /// Iterate over the makefile's lines, call `parse_line` to handle the actual parsing logic, and
     /// manage context.
-    fn parse<R: BufRead>(&mut self, stream: R) -> Result<(), MakeError> {
+    fn parse<R: BufRead>(&mut self, input: R) -> Result<(), MakeError> {
         self.current_rule = None;
+        // let current_logical_line: Option<LogicalLine> = None;
 
-        for (i, result) in stream.lines().enumerate() {
+        for (i, result) in input.lines().enumerate() {
             // Set the context line number and extract the line.
             self.context.line_index = Some(i);
-            let line = result.map_err(|e| MakeError::new(e.to_string(), self.context.clone()))?;
+            let line = result.map_err(|e| MakeError::new(&e.to_string(), self.context.clone()))?;
             self.context.content = Some(line.clone());
+
+            // If we're in a line continuation, then handle smushing the whitespace properly.
+            // if current_logical_line.is_some() {
+            //     if self.current_rule.is_some() {
+            //         // If we're in a rule, then we need to remove the recipe prefix.
+            //         let recipe_prefix = &self.vars.get(".RECIPEPREFIX").value;
+            //         if line.starts_with(recipe_prefix) {
+            //             line = line
+            //                 .strip_prefix(recipe_prefix)
+            //                 .unwrap_or(&line)
+            //                 .to_string();
+            //         }
+            //     } else {
+            //         // Otherwise, replace all leading whitespace with a single space.
+            //         line = line.trim_start().to_string();
+            //         line.insert(0, ' ');
+            //     }
+            // }
+
+            // if line.chars().last().unwrap() == '\\' {
+            //     // Make sure to set the `current_logline` to signal the next physical line should be
+            //     // appended to this one.
+            //     match current_logline {
+            //         Some(mut logline) => logline,
+            //         None => {}
+            //     }
+            // } else {
+            //     match current_line {
+            //         Some(mut logline) => {}
+            //         None => {}
+            //     }
+            // }
 
             // Parse the line.
             self.parse_line(line)?;
@@ -93,7 +118,7 @@ impl<L: Logger> Makefile<L> {
     }
 
     /// The line parser is where the "meat" of the parsing occurs. This is responsible for
-    /// extracting rules from the physical lines of the makefile stream, properly handling escaped
+    /// extracting rules from the physical lines of the makefile input, properly handling escaped
     /// newlines and semicolons, and also managing state, such as variable assignments and
     /// annotating when the parser moves in-to and out-of a rule definition.
     fn parse_line(&mut self, line: String) -> Result<(), MakeError> {
@@ -113,8 +138,9 @@ impl<L: Logger> Makefile<L> {
 
                     if !cmd.is_empty() {
                         r.recipe.push(
-                            expand(cmd.as_str(), &self.vars)
-                                .map_err(|e| MakeError::new(e, self.context.clone()))?,
+                            expand(cmd.as_str(), &self.vars).map_err(|e| {
+                                MakeError::new(&e.to_string(), self.context.clone())
+                            })?,
                         );
                     }
                 }
@@ -165,12 +191,12 @@ impl<L: Logger> Makefile<L> {
 
             self.current_rule = Some(Rule {
                 targets: expand(targets, &self.vars)
-                    .map_err(|e| MakeError::new(e, self.context.clone()))?
+                    .map_err(|e| MakeError::new(&e, self.context.clone()))?
                     .split_whitespace()
                     .map(|s| s.to_string())
                     .collect(),
                 prerequisites: expand(deps, &self.vars)
-                    .map_err(|e| MakeError::new(e, self.context.clone()))?
+                    .map_err(|e| MakeError::new(&e, self.context.clone()))?
                     .split_whitespace()
                     .map(|s| s.to_string())
                     .collect(),
@@ -181,7 +207,7 @@ impl<L: Logger> Makefile<L> {
 
             // Add rule line if we found one.
             if let Some(r) = rule {
-                self.parse_line(format!("{}{}", self.vars.get(".RECIPEPREFIX").value, r))?;
+                self.parse_line(format!("{}{r}", self.vars.get(".RECIPEPREFIX").value))?;
             }
 
             return Ok(());
@@ -192,10 +218,10 @@ impl<L: Logger> Makefile<L> {
             if let Err(e) = self.vars.set(
                 k,
                 &expand(v.trim_start(), &self.vars)
-                    .map_err(|e| MakeError::new(e, self.context.clone()))?,
+                    .map_err(|e| MakeError::new(&e, self.context.clone()))?,
                 false,
             ) {
-                return Err(MakeError::new(e, self.context.clone()));
+                return Err(MakeError::new(&e, self.context.clone()));
             };
             return Ok(());
         }

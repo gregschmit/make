@@ -34,7 +34,7 @@ impl Rule {
 
             // Echo the line to stdout, unless suppressed.
             if command_modifier != Some('@') || makefile.opts.just_print {
-                println!("{}", line);
+                println!("{line}");
 
                 // If we're just printing, we are done with this line.
                 if makefile.opts.just_print {
@@ -47,14 +47,14 @@ impl Rule {
                 .args(&shell_flags)
                 .arg(line)
                 .status()
-                .map_err(|e| MakeError::new(e.to_string(), self.context.clone()))?;
+                .map_err(|e| MakeError::new(&e.to_string(), self.context.clone()))?;
 
             // Check for command errors, unless directed to ignore them.
             if command_modifier != Some('-') && !makefile.opts.ignore_errors {
                 if let Some(code) = res.code() {
                     if code != 0 {
                         return Err(MakeError::new(
-                            format!("Failed with code {}.", code),
+                            &format!("Failed with code {code}."),
                             self.context.clone(),
                         ));
                     }
@@ -117,10 +117,7 @@ impl RuleMap {
                     if rule.double_colon {
                         rule_indices.push(index);
                     } else {
-                        logger.warn(
-                            "Ignoring duplicate definition.".to_string(),
-                            Some(&rule.context),
-                        );
+                        logger.warn("Ignoring duplicate definition.", Some(&rule.context));
                     }
                 }
             }
@@ -130,14 +127,13 @@ impl RuleMap {
     }
 
     /// Execute the rules for a particular target, checking prerequisites.
-    pub fn execute<L: Logger>(
-        &self,
-        makefile: &Makefile<L>,
-        target: &String,
-    ) -> Result<(), MakeError> {
+    pub fn execute<L>(&self, makefile: &Makefile<L>, target: &String) -> Result<(), MakeError>
+    where
+        L: Logger,
+    {
         let rule_indices = self.by_target.get(target).ok_or_else(|| {
             MakeError::new(
-                format!("No rule to make target '{}'.", target),
+                &format!("No rule to make target '{target}'."),
                 Context::new(),
             )
         })?;
@@ -145,10 +141,9 @@ impl RuleMap {
 
         // Old files have their rules ignored.
         if makefile.opts.old_file.contains(target) {
-            makefile.logger.info(
-                format!("Target '{target}' is up to date (old)."),
-                Some(&Context::new()),
-            );
+            makefile
+                .logger
+                .info(&format!("Target '{target}' is up to date (old)."), None);
             return Ok(());
         }
 
@@ -190,7 +185,7 @@ impl RuleMap {
 
         if !executed {
             makefile.logger.info(
-                format!("Target '{target}' is up to date."),
+                &format!("Target '{target}' is up to date."),
                 Some(&Context::new()),
             );
         }

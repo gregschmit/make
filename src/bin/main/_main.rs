@@ -73,7 +73,7 @@ fn find_makefile() -> Option<PathBuf> {
 }
 
 /// Print an error message and exit with code 2.
-fn exit_with(logger: &DefaultLogger, msg: impl AsRef<str>, context: Option<Context>) -> ! {
+fn exit_with(logger: &DefaultLogger, msg: &str, context: Option<Context>) -> ! {
     logger.error(msg, context.as_ref());
     std::process::exit(2)
 }
@@ -83,7 +83,7 @@ fn main() {
     let logger = DefaultLogger {};
 
     if args.license {
-        println!("{}", LICENSE);
+        println!("{LICENSE}");
         return;
     }
 
@@ -93,16 +93,16 @@ fn main() {
     } else {
         // Remember the current directory to return to.
         let cwd = env::current_dir()
-            .unwrap_or_else(|e| exit_with(&logger, format!("Failed to get cwd ({}).", e), None));
+            .unwrap_or_else(|e| exit_with(&logger, &format!("Failed to get cwd ({e})."), None));
 
         // Change to the specified directory.
         let dir = args
             .directory
             .iter()
             .fold(PathBuf::new(), |dir, d| dir.join(d));
-        logger.info(format!("Chdir to `{}`.", dir.display()), None);
+        logger.info(&format!("Chdir to `{}`.", dir.display()), None);
         env::set_current_dir(&dir)
-            .unwrap_or_else(|e| exit_with(&logger, format!("Chdir failed: {}.", e), None));
+            .unwrap_or_else(|e| exit_with(&logger, &format!("Chdir failed: {e}."), None));
 
         Some(cwd)
     };
@@ -129,22 +129,22 @@ fn main() {
     let makefile = match Makefile::new(
         makefile_fn,
         args.clone().into(),
-        Box::new(DefaultLogger {}),
         env::vars().collect::<Env>().into(),
+        DefaultLogger {},
     ) {
-        Err(e) => exit_with(&logger, e.msg, Some(e.context)),
+        Err(e) => exit_with(&logger, &e.msg, Some(e.context)),
         Ok(m) => m,
     };
 
     // Execute the makefile.
     if let Err(e) = makefile.execute(args.targets) {
-        exit_with(&logger, e.msg, Some(e.context));
+        exit_with(&logger, &e.msg, Some(e.context));
     }
 
     // Go back to the original directory, if we changed directory previously.
     if let Some(cwd) = original_dir {
-        logger.info(format!("Chdir back to `{}`.", cwd.display()), None);
+        logger.info(&format!("Chdir back to `{}`.", cwd.display()), None);
         env::set_current_dir(&cwd)
-            .unwrap_or_else(|e| exit_with(&logger, format!("Chdir failed: {}.", e), None));
+            .unwrap_or_else(|e| exit_with(&logger, &format!("Chdir failed: {e}."), None));
     }
 }

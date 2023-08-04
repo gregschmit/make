@@ -8,10 +8,8 @@ pub struct Context {
     pub path: Option<PathBuf>,
     pub content: Option<String>,
 
-    // Line/row number is determined when iterating the input, so we use `usize` here to match the
-    // return type of `enumerate()`. Both line and row are `1`-indexed to match the convention other
-    // programs (including other make implementations) use when referencing line/column numbers, so
-    // `0` is a sentinel value indicating that the value is not set.
+    // Line/row index is determined when iterating the input, so we use `usize` here to match the
+    // return type of `enumerate()`.
     pub line_index: Option<usize>,
     pub column_index: Option<usize>,
 }
@@ -35,8 +33,8 @@ impl Context {
         // convert to the traditional line/column display "number".
         return match self.line_index {
             Some(line) => match self.column_index {
-                Some(column) => Some(format!("{}:{}:{}", path_display, line + 1, column + 1)),
-                None => Some(format!("{}:{}", path_display, line + 1)),
+                Some(column) => Some(format!("{path_display}:{}:{}", line + 1, column + 1)),
+                None => Some(format!("{path_display}:{}", line + 1)),
             },
             None => Some(path_display.to_string()),
         };

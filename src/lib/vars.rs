@@ -93,7 +93,7 @@ pub const DEFAULT_RECURSIVE_VARS: [(&str, &str); 36] = [
     ("PREPROCESS.r", "$(FC) $(FFLAGS) $(RFLAGS) $(TARGET_ARCH) -F"),
 ];
 
-/// Represents the "raw" environment coming from the OS.
+/// The "raw" environment variables, coming from the OS.
 pub type Env = HashMap<String, String>;
 
 /// A single variable, with a value and a flag indicating whether it is recursive.
@@ -183,7 +183,7 @@ impl Vars {
             }
 
             if BAD_VARIABLE_CHARS.contains(&ch) {
-                return Err(format!("Variable contains bad character '{}'.", ch));
+                return Err(format!("Variable contains bad character '{ch}'."));
             }
         }
 
@@ -207,7 +207,7 @@ impl From<Env> for Vars {
         let mut vars = Self::new([]);
 
         for (k, v) in env {
-            // Do not load `SHELL` from the environment.
+            // Don't ever load `SHELL` from the environment.
             if k == "SHELL" {
                 continue;
             }

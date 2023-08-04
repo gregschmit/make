@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::context::Context;
+use crate::logger::context::Context;
 
 /// An error in the parsing or execution of a makefile.
 #[derive(Debug)]
@@ -13,9 +13,9 @@ pub struct MakeError {
 }
 
 impl MakeError {
-    pub fn new(msg: impl AsRef<str>, context: Context) -> Self {
+    pub fn new(msg: &str, context: Context) -> Self {
         Self {
-            msg: msg.as_ref().to_string(),
+            msg: msg.to_string(),
             context,
         }
     }
