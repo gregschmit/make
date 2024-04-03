@@ -9,7 +9,7 @@ use omake::Opts;
 /// The `clap`-based arguments provided by this binary.
 #[derive(Clone, Debug, Parser)]
 #[clap(
-    name = "make (oxidized)",
+    name = "omake",
     version,
     about,
     after_help = formatcp!(
@@ -17,7 +17,7 @@ use omake::Opts;
     ),
 )]
 pub struct Args {
-    /// Target(s) (if none specifired, use first regular target).
+    /// Target(s) (if none specified, use first regular target).
     #[arg()]
     pub targets: Vec<String>,
 
